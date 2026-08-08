@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro + Notas</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #22233a;
+    --accent: #ff6b6b;
+    --accent2: #4ecdc4;
+    --text: #eaeaf0;
+    --text-dim: #9a9ab0;
+    --border: #33344f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .app { width: 100%; max-width: 480px; }
+  h1 {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  /* Timer */
+  .mode-switch {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+  .timer-display {
+    text-align: center;
+    font-size: 4rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin: 16px 0;
+    letter-spacing: 2px;
+  }
+  .timer-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: transform 0.1s, opacity 0.15s;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn:hover { opacity: 0.9; }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 1.5rem; font-weight: 700; color: var(--accent2); }
+  .stat-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+
+  /* Tasks */
+  .card h2 {
+    font-size: 1rem;
+    margin-bottom: 14px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .task-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .task-input-row input {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+  .task-input-row input:focus { outline: 1px solid var(--accent2); }
+  .task-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .task-item.active-task { border-color: var(--accent2); }
+  .task-check {
+    width: 18px; height: 18px;
+    border: 2px solid var(--text-dim);
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-check.done { background: var(--accent2); border-color: var(--accent2); }
+  .task-check.done::after { content: "✓"; font-size: 11px; color: var(--bg); }
+  .task-text { flex: 1; font-size: 0.9rem; cursor: pointer; }
+  .task-text.done { text-decoration: line-through; color: var(--text-dim); }
+  .task-pomo-count { font-size: 0.75rem; color: var(--text-dim); }
+  .task-del {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 1rem; padding: 2px 6px;
+  }
+  .task-del:hover { color: var(--accent); }
+  .empty-msg { text-align: center; color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🍅 Pomodoro + Notas</h1>
+
+  <div class="card">
+    <div class="mode-switch">
+      <button class="mode-btn active" data-mode="work" data-min="25">Enfoque 25</button>
+      <button class="mode-btn" data-mode="short" data-min="5">Descanso 5</button>
+      <button class="mode-btn" data-mode="long" data-min="15">Descanso 15</button>
+    </div>
+    <div class="timer-display" id="timerDisplay">25:00</div>
+    <div class="timer-controls">
+      <button class="btn btn-primary" id="startBtn">Iniciar</button>
+      <button class="btn btn-secondary" id="resetBtn">Reiniciar</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-num" id="statToday">0</div>
+        <div class="stat-label">Hoy</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="statMinutes">0</div>
+        <div class="stat-label">Minutos hoy</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Tareas</h2>
+    <div class="task-input-row">
+      <input type="text" id="taskInput" placeholder="¿En qué vas a enfocarte?" maxlength="120">
+      <button class="btn btn-primary" id="addTaskBtn">+</button>
+    </div>
+    <ul class="task-list" id="taskList"></ul>
+    <div class="empty-msg" id="emptyMsg" style="display:none;">Sin tareas todavía. Agrega una arriba.</div>
+  </div>
+</div>
+
+<audio id="dingSound" preload="auto">
+  <source src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=" type="audio/wav">
+</audio>
+
+<script>
+(function () {
+  const STORAGE_KEY = "pomodoro_notas_state_v1";
+
+  const DURATIONS = { work: 25, short: 5, long: 15 };
+  let state = load();
+
+  let mode = "work";
+  let remaining = DURATIONS.work * 60;
+  let running = false;
+  let intervalId = null;
+
+  const timerDisplay = document.getElementById("timerDisplay");
+  const startBtn = document.getElementById("startBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const modeBtns = document.querySelectorAll(".mode-btn");
+  const taskInput = document.getElementById("taskInput");
+  const addTaskBtn = document.getElementById("addTaskBtn");
+  const taskList = document.getElementById("taskList");
+  const emptyMsg = document.getElementById("emptyMsg");
+  const statToday = document.getElementById("statToday");
+  const statTotal = document.getElementById("statTotal");
+  const statMinutes = document.getElementById("statMinutes");
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { tasks: [], activeTaskId: null, pomosByDate: {}, totalPomos: 0 };
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function todayKey() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, "0");
+    const s = Math.floor(sec % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function updateDisplay() {
+    timerDisplay.textContent = formatTime(remaining);
+    document.title = running ? `${formatTime(remaining)} - Pomodoro` : "Pomodoro + Notas";
+  }
+
+  function updateStats() {
+    const key = todayKey();
+    const todayCount = state.pomosByDate[key] || 0;
+    statToday.textContent = todayCount;
+    statTotal.textContent = state.totalPomos;
+    statMinutes.textContent = todayCount * DURATIONS.work;
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    remaining = DURATIONS[mode] * 60;
+    running = false;
+    clearInterval(intervalId);
+    startBtn.textContent = "Iniciar";
+    modeBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    updateDisplay();
+  }
+
+  function tick() {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(intervalId);
+      running = false;
+      startBtn.textContent = "Iniciar";
+      playDing();
+      if (mode === "work") {
+        const key = todayKey();
+        state.pomosByDate[key] = (state.pomosByDate[key] || 0) + 1;
+        state.totalPomos++;
+        if (state.activeTaskId) {
+          const t = state.tasks.find(t => t.id === state.activeTaskId);
+          if (t) t.pomos = (t.pomos || 0) + 1;
+        }
+        save();
+        updateStats();
+        renderTasks();
+        setMode("short");
+      } else {
+        setMode("work");
+      }
+      return;
+    }
+    updateDisplay();
+  }
+
+  function playDing() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.2, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      o.start();
+      o.stop(ctx.currentTime + 0.6);
+    } catch (e) {}
+  }
+
+  startBtn.addEventListener("click", () => {
+    if (running) {
+      running = false;
+      clearInterval(intervalId);
+      startBtn.textContent = "Iniciar";
+    } else {
+      running = true;
+      startBtn.textContent = "Pausar";
+      intervalId = setInterval(tick, 1000);
+    }
+  });
+
+  resetBtn.addEventListener("click", () => setMode(mode));
+
+  modeBtns.forEach(btn => {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
+  });
+
+  function renderTasks() {
+    taskList.innerHTML = "";
+    emptyMsg.style.display = state.tasks.length === 0 ? "block" : "none";
+    state.tasks.forEach(task => {
+      const li = document.createElement("li");
+      li.className = "task-item" + (task.id === state.activeTaskId ? " active-task" : "");
+
+      const check = document.createElement("div");
+      check.className = "task-check" + (task.done ? " done" : "");
+      check.addEventListener("click", () => {
+        task.done = !task.done;
+        save();
+        renderTasks();
+      });
+
+      const text = document.createElement("span");
+      text.className = "task-text" + (task.done ? " done" : "");
+      text.textContent = task.text;
+      text.addEventListener("click", () => {
+        state.activeTaskId = state.activeTaskId === task.id ? null : task.id;
+        save();
+        renderTasks();
+      });
+
+      const pomoCount = document.createElement("span");
+      pomoCount.className = "task-pomo-count";
+      pomoCount.textContent = task.pomos ? `🍅${task.pomos}` : "";
+
+      const del = document.createElement("button");
+      del.className = "task-del";
+      del.textContent = "✕";
+      del.addEventListener("click", () => {
+        state.tasks = state.tasks.filter(t => t.id !== task.id);
+        if (state.activeTaskId === task.id) state.activeTaskId = null;
+        save();
+        renderTasks();
+      });
+
+      li.appendChild(check);
+      li.appendChild(text);
+      li.appendChild(pomoCount);
+      li.appendChild(del);
+      taskList.appendChild(li);
+    });
+  }
+
+  function addTask() {
+    const val = taskInput.value.trim();
+    if (!val) return;
+    state.tasks.push({ id: Date.now(), text: val, done: false, pomos: 0 });
+    taskInput.value = "";
+    save();
+    renderTasks();
+  }
+
+  addTaskBtn.addEventListener("click", addTask);
+  taskInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") addTask();
+  });
+
+  updateDisplay();
+  updateStats();
+  renderTasks();
+})();
+</script>
+</body>
+</html>
